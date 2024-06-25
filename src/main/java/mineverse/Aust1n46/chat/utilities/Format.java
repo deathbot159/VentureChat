@@ -2,10 +2,7 @@ package mineverse.Aust1n46.chat.utilities;
 
 import static mineverse.Aust1n46.chat.MineverseChat.getInstance;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.StringTokenizer;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -15,6 +12,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import org.json.JSONArray;
 import org.json.simple.JSONObject;
 
 import com.comphenix.protocol.PacketType;
@@ -55,6 +53,7 @@ public class Format {
 	public static final long MILLISECONDS_PER_SECOND = 1000;
 	
 	public static final String DEFAULT_MESSAGE_SOUND = "ENTITY_PLAYER_LEVELUP";
+	public static final String DEFAULT_PING_SOUND = "BLOCK_AMETHYST_BLOCK_HIT";
 	public static final String DEFAULT_LEGACY_MESSAGE_SOUND = "LEVEL_UP";
 
 	/**
@@ -248,6 +247,41 @@ public class Format {
      */
 	public static String convertToJsonColors(String s) {
 		return convertToJsonColors(s, "");
+	}
+
+	/**
+	 * Converts a color tags in string to minecraft like colors (with §)
+	 * @param s
+	 * @return {@link String}
+	 */
+	public static String convertToMinecraftColors(String s){
+		Pattern pattern = Pattern.compile("&[0-9a-fA-Fk-oK-OrR]|&#[0-9a-fA-F]{6}");
+		Matcher matcher = pattern.matcher(s);
+
+		String converted = s;
+
+		while(matcher.find()){
+			String orig = matcher.group();
+			String[] separated = orig.split("");
+			if (separated.length == 2){
+				separated[0] = "§";
+			}else{
+				for(int i = 0; i<separated.length; i++){
+					if(Objects.equals(separated[i], "&")){
+						separated[i] = "§";
+						continue;
+					}
+					if(Objects.equals(separated[i], "#")){
+						separated[i] = "x";
+						continue;
+					}
+					separated[i] = "§"+separated[i];
+				}
+			}
+			converted = converted.replace(orig, String.join("", separated));
+		}
+
+		return converted;
 	}
 
 	/**
@@ -956,10 +990,20 @@ public class Format {
 			mcp.getPlayer().sendMessage(message);
 		}
 	}
-	
+
 	public static void playMessageSound(MineverseChatPlayer mcp) {
 		Player player = mcp.getPlayer();
 		String soundName = getInstance().getConfig().getString("message_sound", DEFAULT_MESSAGE_SOUND);
+		if(!soundName.equalsIgnoreCase("None")) {
+			Sound messageSound = getSound(soundName);
+			player.playSound(player.getLocation(), messageSound, 1, 0);
+		}
+	}
+
+	public static void playMessageSound(MineverseChatPlayer mcp, boolean ping) {
+		if(!ping) playMessageSound(mcp);
+		Player player = mcp.getPlayer();
+		String soundName = getInstance().getConfig().getString("ping_sound", DEFAULT_PING_SOUND);
 		if(!soundName.equalsIgnoreCase("None")) {
 			Sound messageSound = getSound(soundName);
 			player.playSound(player.getLocation(), messageSound, 1, 0);
