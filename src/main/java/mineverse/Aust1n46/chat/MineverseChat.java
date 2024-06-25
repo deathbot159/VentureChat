@@ -6,15 +6,19 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.text.MessageFormat;
+import java.util.*;
+import java.util.logging.Level;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
+import net.luckperms.api.LuckPerms;
+import net.luckperms.api.LuckPermsProvider;
+import net.luckperms.api.model.user.User;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.RegisteredServiceProvider;
@@ -50,6 +54,8 @@ import mineverse.Aust1n46.chat.utilities.Format;
 import mineverse.Aust1n46.chat.versions.VersionHandler;
 import net.milkbowl.vault.chat.Chat;
 import net.milkbowl.vault.permission.Permission;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * VentureChat Minecraft plugin for servers running Spigot or Paper software.
@@ -386,7 +392,32 @@ public class MineverseChat extends JavaPlugin implements PluginMessageListener {
 				String globalJSON = msgin.readUTF();
 				String primaryGroup = msgin.readUTF();
 				String nickname = msgin.readUTF();
-				
+
+				LuckPerms lp = LuckPermsProvider.get();
+				//ping check
+				ConfigurationSection ps = MineverseChat.getInstance().getConfig().getConfigurationSection("ping");
+				ArrayList<String> pingedUserNames = new ArrayList<String>();
+				boolean includesPing = false;
+				String pingPermissions = ps.getString("permissions", "None");
+				User sender = lp.getUserManager().getLoadedUsers().stream().filter((user) ->{
+					return user.getUniqueId().equals(senderUUID);
+				}).collect(Collectors.toList()).get(0);
+				if (sender == null){
+					sender = lp.getUserManager().loadUser(senderUUID).get();
+				}
+				if(MineverseChatAPI.getMineverseChatPlayer(senderUUID) != null) {
+					if (pingPermissions.equalsIgnoreCase("None") ||
+							sender.getCachedData().getPermissionData().checkPermission(pingPermissions).asBoolean()) {
+						Pattern pingPattern = Pattern.compile("@\\S{1,16}");
+						Matcher matcher = pingPattern.matcher(chat);
+
+						while (matcher.find()) {
+							pingedUserNames.add(matcher.group().substring(1));
+							includesPing = true;
+						}
+					}
+				}
+
 				if(!ChatChannel.isChannel(chatchannel)) {
 					return;
 				}
@@ -395,10 +426,11 @@ public class MineverseChat extends JavaPlugin implements PluginMessageListener {
 				if(!chatChannelObject.getBungee()) {
 					return;
 				}
-				
+
 				Set<Player> recipients = new HashSet<Player>();
 				for(MineverseChatPlayer p : MineverseChatAPI.getOnlineMineverseChatPlayers()) {
 					if(p.isListening(chatChannelObject.getName())) {
+
 						recipients.add(p.getPlayer());
 					}
 				}
@@ -435,7 +467,27 @@ public class MineverseChat extends JavaPlugin implements PluginMessageListener {
 							}
 							continue;
 						}
-						Format.sendPacketPlayOutChat(p.getPlayer(), packet);	
+
+						if(includesPing && pingedUserNames.contains(p.getPlayer().getName())){
+							MineverseChatPlayer pingSender = MineverseChatAPI.getMineverseChatPlayer(senderUUID);
+							//TODO: add reply when ping in message was clicked
+							//TODO: check orig text color
+							String pingStyle = Format.convertToMinecraftColors(ps.getString("style", "None"));
+							if(Objects.equals(pingStyle, "None")) pingStyle = "";
+							String pingPrefix = Format.convertToMinecraftColors(ps.getString("prefix", "None"));
+							if(Objects.equals(pingPrefix, "None")) pingPrefix = "";
+							String pingSuffix = Format.convertToMinecraftColors(ps.getString("suffix", "None"));
+							if(Objects.equals(pingSuffix, "None")) pingSuffix = "";
+							String jsonWithPing = Format.convertToJson(pingSender, format,
+									chat.replace("@"+p.getPlayer().getName(),
+									MessageFormat.format(
+											pingPrefix+pingStyle+"@{0}"+pingSuffix+"§r", p.getPlayer().getName())));
+							jsonWithPing = Format.formatModerationGUI(jsonWithPing, p.getPlayer(), senderName, chatchannel, hash);
+							Format.sendPacketPlayOutChat(p.getPlayer(), Format.createPacketPlayOutChat(jsonWithPing));
+							Format.playMessageSound(p, true);
+							continue;
+						}
+						Format.sendPacketPlayOutChat(p.getPlayer(), packet);
 					}
 				}
 			}
@@ -1015,6 +1067,7 @@ public class MineverseChat extends JavaPlugin implements PluginMessageListener {
 					}
 					p.getPlayer().sendMessage(Format.FormatStringAll(PlaceholderAPI.setBracketPlaceholders(p.getPlayer(), send.replaceAll("receiver_", ""))) + msg);
 					if(p.hasNotifications()) {
+
 						Format.playMessageSound(p);
 					}
 					if(MineverseChatAPI.getMineverseChatPlayer(sender) == null) {
