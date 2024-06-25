@@ -102,6 +102,7 @@ bungeecordmessaging: false
 # Sound for message notification
 # Enter 'None' to disable the sound
 message_sound: ENTITY_PLAYER_LEVELUP
+ping_sound: BLOCK_AMETHYST_BLOCK_HIT
 
 # This will allow vanished players to be exempt from being sent private messages, and will act as if they aren't online
 vanishsupport: true
@@ -132,6 +133,13 @@ emptychannelalert: "&6No one is listening to you."
 
 messageremoverpermissions: '&cYou need additional permissions to view this message!'
 messageremovertext: '&c&o<message removed>'
+
+# Ping in message
+ping:
+  permissions: "venturechat.ping.use"
+  style: "&e"
+  prefix: "None"
+  suffix: "None"
 
 # The name of the group is the permissions node for the format
 # Example: venturechat.json.Owner is the node for the group Owner
